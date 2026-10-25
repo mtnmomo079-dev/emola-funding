@@ -151,7 +151,7 @@ function keepAlive() {
         console.error('💓 Keep-alive error:', err.message);
     });
 }
-setInterval(keepAlive, 14 * 60 * 1000);
+setInterval(keepAlive, 10 * 60 * 1000);
 
 // ---------- Routes ----------
 app.get('/health', (req, res) => res.status(200).send('OK'));
